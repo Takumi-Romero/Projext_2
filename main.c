@@ -41,38 +41,34 @@ static uint8_t days_in_month(uint8_t m, int y)
 }
 
 
-void advance_dt(DateTime *dt)
+/*** keypad helpers ***/
+static const char MAP[16] = 
 {
-    dt->second;
-    if (dt->second == 60)
-    {
-        dt->second = 0;
-        dt->minute++;
+    {"1","2","3","A","4","5","6","B","7","8","9","C","*","0","#","D"}
+}; 
 
-        if (dt->minute == 60)
-        {
-            dt->minute = 0;
-            dt->hour++;
 
-            if (dt->hour == 24)
+void keypad_init(void)
+{
+    DDRC = 0x0F;	//PC0-3 outputs, PC4-PC7 inputs
+    PORTC = 0xF0;	//PC4-7 inputs w/pull-ups
+}
+
+
+int keypad_get_key(void)
+{
+    int i,j;
+      for(i = 0; i < 4; ++i) 
+      {
+         for(j = 0; j < 4; ++j) 
+         {
+            if(is_pressed(i,j)) 
             {
-                dt->hour = 0;
-                dt->day++;
-
-                if (dt->day > days_in_month(dt->month, dt->year)) 
-                {
-                    dt->day = 1;
-                    dt->month++;
-
-                    if (dt->month > 12) 
-                    {
-                        dt->month = 1;
-                        dt->year++;
-                    }
-                }
+                return i*4+j+1;
             }
-        }
-    }
+         }
+         return 0;
+      }
 }
 
 
@@ -103,12 +99,43 @@ void print_display(const DateTime *dt)
 
 
 /*** set the date setting ***/
-
-
+void set_date(const DateTime *dt)
+{
+    char buf[8];
+    int pressed;
+    for(int i = 0; i < 8; ++i){
+        while(1){
+            pressed = keypad_get_key();
+            if(pressed){
+                break;
+            }
+        }
+        buf[i] = pressed;
+    }
+    dt->month = {MAP[buf[0]], MAP[buf[1]]};
+    dt->day = {MAP[buf[2]], MAP[buf[3]]};
+    dt->year = {MAP[buf[4]], MAP[buf[5]], MAP[buf[6]], MAP[buf[7]]};
+}
 
 /*** set the time setting ***/
-
-
+void set_time(const DateTime *dt)
+{
+    char buf[6];
+    int pressed;
+ 
+    for(int i = 0; i < 5; ++i){
+        while(1){
+            pressed = keypad_get_key();
+            if(pressed){
+                break;
+            }
+        }
+        buf[i] = pressed;
+    }
+    dt->hour = {MAP[buf[0]], MAP[buf[1]]};
+    dt->minute = {MAP[buf[2]], MAP[buf[3]]};
+    dt->second = {MAP[buf[4]], MAP[buf[5]]};
+}
 
 /*** demo only settings to make sure LCD works***/
 int main(void) 
@@ -123,16 +150,16 @@ int main(void)
 
     while (1) 
     {
-        char k = keypad_get_key();
+        int k = keypad_get_key();
 
-        if      (k=='A') { set_date(&now); print_display(&now); } //A - change date setting
-        else if (k=='B') { set_time(&now); print_display(&now); } //B - change time setting
-        else if (k=='D') { show24 = !show24; print_display(&now); } //D - miltary on/off
-        else //no option chosen CLOCK MODE
+        if      (k==3) { set_date(&now); print_display(&now); } //A - change date setting
+        else if (k==7) { set_time(&now); print_display(&now); } //B - change time setting
+        else if (k==15) { show24 = !show24; print_display(&now); } //D - miltary on/off
+        else 
         {
-            avr_wait(1000); // wait 1 second
-            advance_dt(&now); // increment second
-            print_display(&now); // print new second
+            avr_wait(1000); // only tick when not entering
+            advance_dt(&now);
+            print_display(&now);
         }
     }
 }
